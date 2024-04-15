@@ -24,7 +24,6 @@ const unmask = (value: string, { thousandsSeparator }: FormattingOptions = forma
 }
 
 const parseUnits = (value: string, decimals: number) => {
-  // viem assumes the decimal separator is a dot
   return viemParseUnits(value.replace(',', '.'), decimals)
 }
 

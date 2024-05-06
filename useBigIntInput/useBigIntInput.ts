@@ -1,5 +1,5 @@
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { formatUnits, parseUnits as viemParseUnits } from 'viem/utils'
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { formatUnits, parseUnits as viemParseUnits } from 'viem/utils';
 
 type FormattingOptions =
   | { decimalSeparator: '.'; thousandsSeparator: ',' }
@@ -7,7 +7,7 @@ type FormattingOptions =
 
 // some locales use "," as decimal separator and "." as thousands separator
 const formattingOptions = (() => {
-  const decimalSeparator = (1.1).toLocaleString(navigator.languages[0]).substring(1, 2)
+  const decimalSeparator = (1.1).toLocaleString().substring(1, 2)
   if (decimalSeparator === '.') return { decimalSeparator: '.', thousandsSeparator: ',' } as const
   return { decimalSeparator: ',', thousandsSeparator: '.' } as const
 })()

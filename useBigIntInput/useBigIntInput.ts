@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { formatUnits, parseUnits as viemParseUnits } from 'viem/utils'
 
 type FormattingOptions =
@@ -105,7 +105,7 @@ function handleMaskedInput(
     return {
       numericValue: newNumericValue,
       maskedValue: newMaskedInput,
-      cursor: newCursor,
+      cursor: newCursor > 0 ? newCursor : 0,
     }
   }
 
@@ -120,26 +120,19 @@ export type UseBigIntInput = {
   ref: React.RefObject<HTMLInputElement>
   value?: bigint
   decimals: number
-  onChange: (value: bigint) => void
+  onChange: (value: bigint, rawValue: string, changedFromProps: boolean) => void
 }
 export function useBigIntInput({ ref, value, decimals, onChange: onValueChange }: UseBigIntInput) {
-  const [internalValue, setInternalValue] = useState(
-    value ? mask(formatUnits(value, decimals)) : '',
-  )
+  const [input, setInput] = useState(() => {
+    const internalValue = value ? mask(formatUnits(value, decimals)) : ''
+    return { internalValue, cursor: internalValue.length }
+  })
 
   // react can't keep track of the cursor position when the input value changes and it's not the same e.target.value
   // so to make the mask work we have to keep track of the cursor position and set it manually
-  const [cursorPosition, setCursor] = useState(internalValue.length)
   useLayoutEffect(() => {
-    ref.current?.setSelectionRange(cursorPosition, cursorPosition)
-  })
-
-  // update internal value if the value prop changes
-  if (value !== undefined && value !== parseUnits(unmask(internalValue), decimals)) {
-    const maskedValue = mask(formatUnits(value, decimals))
-    setCursor(maskedValue.length)
-    setInternalValue(value === 0n ? '' : maskedValue)
-  }
+    ref.current?.setSelectionRange(input.cursor, input.cursor)
+  }, [input, ref])
 
   // use this "latest ref pattern" so the user don't need to worry about stabilizing the `onChange` callback
   const onValueChangeRef = useRef(onValueChange)
@@ -147,22 +140,33 @@ export function useBigIntInput({ ref, value, decimals, onChange: onValueChange }
     onValueChangeRef.current = onValueChange
   })
 
+  // update internal value if the value prop changes
+  if (value !== undefined && value !== parseUnits(unmask(input.internalValue), decimals)) {
+    const maskedValue = mask(formatUnits(value, decimals))
+    const newInternalValue = value === 0n ? '' : maskedValue
+    setInput((s) => ({ internalValue: newInternalValue, cursor: s.cursor }))
+    onValueChangeRef.current?.(value, newInternalValue, true)
+  }
+
   const onChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const { numericValue, maskedValue, cursor } = handleMaskedInput(e, decimals)
 
-      setCursor(cursor)
-      setInternalValue(maskedValue)
-      onValueChangeRef.current?.(parseUnits(numericValue, decimals))
+      setInput({ internalValue: maskedValue, cursor })
+      onValueChangeRef.current?.(parseUnits(numericValue, decimals), maskedValue, false)
     },
     [decimals],
   )
 
-  return {
-    value: internalValue,
-    onChange,
-    ref,
-    inputMode: 'decimal',
-    placeholder: `0${formattingOptions.decimalSeparator}00`,
-  } as const
+  return useMemo(
+    () =>
+      ({
+        value: input.internalValue,
+        onChange,
+        ref,
+        inputMode: 'decimal',
+        placeholder: `0${formattingOptions.decimalSeparator}00`,
+      }) as const,
+    [input.internalValue, onChange, ref],
+  )
 }

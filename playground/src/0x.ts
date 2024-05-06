@@ -8,7 +8,7 @@ type QuoteParams = {
   sellToken: Address
   buyToken: Address
   takerAddress: Address
-  priceImpactProtectionPercentage?: `0.${string}` // 1 is 100% and disables the feat
+  priceImpactProtectionPercentage?: `0.${number}` // 1 is 100% and disables the feat
 } & ({ sellAmount: bigint; buyAmount?: never } | { sellAmount?: never; buyAmount: bigint })
 
 const parseQuoteParams = ({ sellAmount, buyAmount, ...params }: QuoteParams) =>

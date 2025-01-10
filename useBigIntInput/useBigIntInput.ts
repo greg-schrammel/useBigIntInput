@@ -1,5 +1,5 @@
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { formatUnits, parseUnits as viemParseUnits } from 'viem/utils';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { formatUnits, parseUnits as viemParseUnits } from 'viem/utils'
 
 type FormattingOptions =
   | { decimalSeparator: '.'; thousandsSeparator: ',' }
@@ -36,9 +36,7 @@ function toNumericString(
 
   if (value === decimalSeparator) return ''
 
-  // WORKAROUND: the fucking iphone shows a keyboard in a style that's not the same as the safari navigator language ????
   if (value.endsWith(thousandsSeparator)) value = value.slice(0, -1) + decimalSeparator
-  // -------------------------
 
   // match any character that is not a digit or the decimal separator
   // then split the string by the decimal separator (maybe the user try to input more than one decimal separator eg. "1.2.3")
@@ -117,10 +115,10 @@ function handleMaskedInput(
 }
 
 export type UseBigIntInput = {
-  ref: React.RefObject<HTMLInputElement>
+  ref: React.RefObject<HTMLInputElement | null>
   value?: bigint
   decimals: number
-  onChange: (value: bigint, rawValue: string, changedFromProps: boolean) => void
+  onChange: (value: bigint, maskedValue: string, changedFromProps: boolean) => void
 }
 export function useBigIntInput({ ref, value, decimals, onChange: onValueChange }: UseBigIntInput) {
   const [input, setInput] = useState(() => {

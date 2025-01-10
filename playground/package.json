@@ -9,25 +9,25 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@tanstack/react-query": "^5.29.2",
-    "@tanstack/react-router": "^1.28.8",
-    "@types/node": "^20.12.7",
-    "autoprefixer": "^10.4.19",
-    "postcss": "^8.4.38",
-    "prettier": "^3.2.5",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "tailwind-merge": "^2.2.2",
-    "tailwindcss": "^3.4.3",
-    "use-bigint-input": "workspace:*",
-    "viem": "^2.9.17",
-    "wagmi": "^2.5.20"
+    "@tanstack/react-query": "^5.63.0",
+    "@tanstack/react-router": "^1.95.1",
+    "@types/node": "^22.10.5",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "prettier": "^3.4.2",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwind-merge": "^2.6.0",
+    "tailwindcss": "^3.4.17",
+    "use-bigint-input": "0.0.6",
+    "viem": "^2.22.5",
+    "wagmi": "^2.14.7"
   },
   "devDependencies": {
-    "@types/react": "^18.2.66",
-    "@types/react-dom": "^18.2.22",
-    "@vitejs/plugin-react-swc": "^3.5.0",
-    "typescript": "^5.2.2",
-    "vite": "^5.2.0"
+    "@types/react": "^19.0.4",
+    "@types/react-dom": "^19.0.2",
+    "@vitejs/plugin-react-swc": "^3.7.2",
+    "typescript": "^5.7.3",
+    "vite": "^6.0.7"
   }
 }

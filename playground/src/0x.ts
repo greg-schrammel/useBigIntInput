@@ -1,8 +1,13 @@
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { Address } from 'viem'
 import { arbitrum, base, mainnet, optimism, polygon } from 'viem/chains'
 
 const supported_chains = [mainnet.id, polygon.id, optimism.id, arbitrum.id, base.id]
+
+export const enum QuoteDirection {
+  buy,
+  sell,
+}
 
 type QuoteParams = {
   sellToken: Address
@@ -38,13 +43,13 @@ export const useSwapQuote = ({
   takerAddress: Address
   priceImpactProtectionPercentage?: `0.${string}` // 1 is 100% and disables the feat
   amount: bigint
-  direction: 'sell' | 'buy'
+  direction: QuoteDirection
 }) => {
   const parsedParams = parseQuoteParams({
     sellToken,
     buyToken,
     takerAddress,
-    ...(direction === 'sell' ? { sellAmount: amount } : { buyAmount: amount }),
+    ...(direction === QuoteDirection.sell ? { sellAmount: amount } : { buyAmount: amount }),
   })
   return useQuery({
     queryKey: ['swapQuote', { chainId, params: parsedParams }] as const,
@@ -66,6 +71,7 @@ export const useSwapQuote = ({
     staleTime: 1000 * 10, // 10s
     gcTime: 1000 * 30, // 30s
     refetchInterval: 1000 * 10, // 10s
+    placeholderData: keepPreviousData,
   })
 }
 

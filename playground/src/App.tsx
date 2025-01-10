@@ -1,14 +1,14 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { forwardRef, useRef, useState } from 'react'
 import { twMerge } from 'tailwind-merge'
-import { useBigIntInput } from 'use-bigint-input/useBigIntInput'
-import { useStateWithHistory, useWindowEventListener } from 'use-bigint-input/useStateWithHistory'
+import { useBigIntInput } from 'use-bigint-input'
+import { useStateWithHistory } from './useStateWithHistory'
+import { useWindowEventListener } from './useEventListener'
 import { Address, erc20Abi, formatUnits, http } from 'viem'
 import { WagmiProvider, createConfig, useReadContract } from 'wagmi'
 import { base } from 'wagmi/chains'
-import { useSwapQuote } from './0x'
+import { QuoteDirection, useSwapQuote } from './0x'
 import { mergeRefs } from './mergeRefs'
-import { useDebounce } from './useDebounce'
 
 type Currency = {
   name: string
@@ -17,7 +17,6 @@ type Currency = {
   iconUrl: string
 }
 type Erc20 = Currency & { address: Address; chainId: number }
-type NativeToken = Currency & { chainId: number }
 
 const weth = {
   address: '0x4200000000000000000000000000000000000006',
@@ -26,7 +25,7 @@ const weth = {
   decimals: 18,
   chainId: base.id,
   iconUrl: 'https://etherscan.io/token/images/weth_28.png',
-} as Erc20
+} satisfies Erc20
 
 const usdc = {
   address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
@@ -35,15 +34,6 @@ const usdc = {
   decimals: 6,
   chainId: base.id,
   iconUrl: 'https://etherscan.io/token/images/centre-usdc_28.png',
-} as Erc20
-
-const degen = {
-  address: '0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed',
-  name: 'Degen',
-  symbol: 'DEGEN',
-  decimals: 18,
-  chainId: base.id,
-  iconUrl: 'https://basescan.org/token/images/degentips_32.png',
 } satisfies Erc20
 
 const takerAddress = '0x507f0daa42b215273b8a063b092ff3b6d27767af'
@@ -125,9 +115,9 @@ const AmountInput = forwardRef(function TokenInput(
     ref: ref,
     decimals,
     value,
-    onChange(value, rawValue, changedFromProps) {
+    onChange(value, maskedValue, changedFromProps) {
       if (!changedFromProps) onChange(value)
-      setInputWidth(Math.min(Math.max(rawValue.length, 4), 19) + 'ch')
+      setInputWidth(Math.min(Math.max(maskedValue.length, 4), 19) + 'ch')
     },
   })
 
@@ -153,39 +143,17 @@ type SwapState = {
   buyToken: Erc20
   sellToken: Erc20
   amount: bigint
-  direction: 'sell' | 'buy'
+  direction: QuoteDirection
 }
 
 const initialState = {
-  buyToken: degen,
+  buyToken: usdc,
   sellToken: weth,
-  direction: 'sell',
+  direction: QuoteDirection.sell,
   amount: 0n,
 } satisfies SwapState
 
 const isSameToken = (a: Erc20, b: Erc20) => a.address === b.address && a.chainId === b.chainId
-
-function TokenAmountQuote({
-  sellToken,
-  buyToken,
-  amount,
-}: {
-  sellToken: Erc20
-  buyToken: Erc20
-  amount: bigint
-}) {
-  return (
-    <span
-      className="
-    absolute -bottom-3 left-0 w-full
-    text-[10px] text-left font-medium text-neutral-400 
-    overflow-ellipsis transition-all whitespace-nowrap
-  "
-    >
-      ~${formatNumberCompact(1321.24)}
-    </span>
-  )
-}
 
 function TokenAmountInput({
   onChangeAmount,
@@ -209,7 +177,6 @@ function TokenAmountInput({
         value={amount}
         decimals={token.decimals}
       />
-      <TokenAmountQuote sellToken={token} buyToken={usdc} amount={amount} />
       <div className="flex flex-col transition-all">
         <TokenSelector token={token} onClick={onChangeToken} />
         <MaxBalance token={token} account={takerAddress} onClick={onChangeAmount} />
@@ -218,18 +185,29 @@ function TokenAmountInput({
   )
 }
 
+function convertDecimals(amount: bigint, fromDecimals: number, toDecimals: number) {
+  const scaleFactor = BigInt(Math.pow(10, Math.abs(toDecimals - fromDecimals)))
+  return toDecimals > fromDecimals ? amount * scaleFactor : amount / scaleFactor
+}
+
 const Swap = () => {
   const [{ buyToken, sellToken, amount, direction }, setSwapState, { undo, redo }] =
     useStateWithHistory<SwapState>(initialState)
 
-  const onChangeAmount = (direction: 'buy' | 'sell') => (amount: bigint) => {
+  const onChangeAmount = (direction: QuoteDirection) => (amount: bigint) => {
     setSwapState((currentState) => ({ ...currentState, amount, direction }))
   }
 
-  const onChangeToken = (direction: 'buy' | 'sell') => (token: Erc20) => {
+  const onChangeToken = (direction: QuoteDirection) => (token: Erc20) => {
     setSwapState((currentState) => {
-      if (isSameToken(token, currentState[direction === 'buy' ? 'sellToken' : 'buyToken'])) {
-        return { ...currentState, buyToken: sellToken, sellToken: buyToken }
+      const otherToken = currentState[direction === QuoteDirection.buy ? 'sellToken' : 'buyToken']
+      if (isSameToken(token, otherToken)) {
+        return {
+          ...currentState,
+          buyToken: sellToken,
+          sellToken: buyToken,
+          amount: convertDecimals(amount, sellToken.decimals, buyToken.decimals),
+        }
       }
       return { ...currentState, [`${direction}Token`]: token }
     })
@@ -243,44 +221,45 @@ const Swap = () => {
     }
   })
 
-  const debouncedAmount = useDebounce(amount, 1000)
-
   const { data, isFetching } = useSwapQuote({
     chainId: sellToken.chainId,
     sellToken: sellToken.address,
     buyToken: buyToken.address,
-    amount: debouncedAmount,
+    amount,
     direction,
     takerAddress,
   })
 
-  const oppositeDirection = direction === 'sell' ? 'buy' : 'sell'
+  const oppositeDirection =
+    direction === QuoteDirection.sell ? QuoteDirection.buy : QuoteDirection.sell
   const values = {
     [direction]: amount,
     [oppositeDirection]:
-      (direction === 'sell' ? data?.grossBuyAmount : data?.grossSellAmount) || 0n,
-  } as Record<'sell' | 'buy', bigint>
+      amount > 0n
+        ? (direction === QuoteDirection.sell ? data?.grossBuyAmount : data?.grossSellAmount) || 0n
+        : 0n,
+  } as Record<QuoteDirection, bigint>
 
   return (
     <div className="flex items-center gap-3 flex-wrap">
       <div className="flex items-center gap-3 h-10 transition-all">
         <span className="text-sm font-semibold text-neutral-900">Trade</span>
         <TokenAmountInput
-          onChangeToken={() => onChangeToken('sell')(buyToken)}
-          onChangeAmount={onChangeAmount('sell')}
-          isLoading={direction === 'buy' && isFetching}
+          onChangeToken={() => onChangeToken(QuoteDirection.sell)(buyToken)}
+          onChangeAmount={onChangeAmount(QuoteDirection.sell)}
+          isLoading={direction === QuoteDirection.buy && isFetching}
           token={sellToken}
-          amount={values.sell}
+          amount={values[QuoteDirection.sell]}
         />
       </div>
       <div className="flex items-center gap-3 h-10">
         <span className="text-sm font-semibold text-neutral-900">for</span>
         <TokenAmountInput
-          onChangeToken={() => onChangeToken('buy')(sellToken)}
-          onChangeAmount={onChangeAmount('buy')}
-          isLoading={direction === 'sell' && isFetching}
+          onChangeToken={() => onChangeToken(QuoteDirection.buy)(sellToken)}
+          onChangeAmount={onChangeAmount(QuoteDirection.buy)}
+          isLoading={direction === QuoteDirection.sell && isFetching}
           token={buyToken}
-          amount={values.buy}
+          amount={values[QuoteDirection.buy]}
         />
       </div>
     </div>
